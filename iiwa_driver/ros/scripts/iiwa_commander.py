@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -----------------------------------------------------------------------------
 # Copyright 2015 Fraunhofer IPA
 #
@@ -22,8 +22,9 @@ import time
 import rospy
 import random
 import socket
-import thread
+import _thread as thread
 from iiwa_driver.srv import *
+
 # -----------------------------------------------------------------------------
 # Default parameters, they will be overwritten by the config.yaml file
 # -----------------------------------------------------------------------------
@@ -42,7 +43,7 @@ def connect():
 			rospy.logwarn('Connecting to ' + TCP_IP + ":" + str(TCP_PORT))
 			sock.connect((TCP_IP, TCP_PORT))
 			rospy.logwarn('Connected to ' + TCP_IP + ":" + str(TCP_PORT))
-			break;
+			break
 		except:	
 			time.sleep(1)
 # -----------------------------------------------------------------------------
@@ -51,8 +52,11 @@ def connect():
 def flush(line):
 	while not rospy.is_shutdown():
 		try:
-			sock.send(line)
-			return sock.recv(1024)
+			sock.send(line.encode())
+			rospy.logwarn(line.encode())
+			rsl = sock.recv(1024)
+			rospy.logwarn('Received: ' + rsl.decode())
+			return rsl.decode()
 		except:
 			connect()
 # -----------------------------------------------------------------------------
@@ -60,12 +64,15 @@ def flush(line):
 # -----------------------------------------------------------------------------
 def send_command(req):
 	with lock:	# rospy seems not to deal good with concurrent service calls therefore the need to do it manually
+		
 		response = StringCommandResponse()	# ROS StringCommandResponse service response
 		response.error_code = 0				# No error by default
-		
-		rospy.logdebug("Sent: " + req.command + " : " + req.parameters + "\n")	# Debug	
+
 		response.response = flush(req.command + " : " + req.parameters + "\n")	
-		rospy.logdebug("Received: " + response.response)	# Debug
+		if response.response is not None:
+			rospy.logwarn("Received: " + response.response)	# Debug
+		else:
+			rospy.logwarn("Received: None")
 		
 		if response.response == 'error':
 			response.error_code = 1
@@ -74,7 +81,6 @@ def send_command(req):
 # Main
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
-
 	# Start node
 	rospy.init_node('iiwa_com')
 	
@@ -82,6 +88,8 @@ if __name__ == "__main__":
 	TCP_IP = rospy.get_param('~robot_ip', TCP_IP)
 	TCP_PORT = rospy.get_param('~robot_port', TCP_PORT)
 	SERVICE_NAME = rospy.get_param('~commander_service_name', SERVICE_NAME)
+
+	rospy.loginfo("Robot IP: " + TCP_IP)
 	
 	connect()
 

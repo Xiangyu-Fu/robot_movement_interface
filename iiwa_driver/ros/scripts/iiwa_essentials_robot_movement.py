@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -----------------------------------------------------------------------------
 # Copyright 2015 Fraunhofer IPA
 #
@@ -26,7 +26,7 @@
 # -----------------------------------------------------------------------------
 import math
 import rospy
-import thread
+import _thread as thread
 import copy
 from geometry_msgs.msg			   import WrenchStamped
 from sensor_msgs.msg               import JointState
@@ -52,6 +52,7 @@ conf_pub_topic_joints		= 'joint_states'	# Joint configuration publishing
 conf_pub_topic_wrench 		= 'tcp_wrench'		# Force and torque publishing
 conf_pub_topic_iiwa_frame	= 'tool_frame' 		# Frame publishing as iiwa frame
 conf_pub_topic_iiwa_flange	= 'flange_frame'	# Flange frame publishing as iiwa frame
+conf_pub_topic_robot_state	= 'robot_state' 	# Current robot state
 # ------------------------------------------------------------------------------------
 # Additional configuration - This default configuration will be overwritten by the config.yaml file
 # ------------------------------------------------------------------------------------
@@ -93,6 +94,7 @@ def publishers(rate):
 	global current_flange_frame
 	global current_tcp_force
 	global current_tcp_torque
+	global current_safety_state
 
 	com = rospy.ServiceProxy(conf_com_node, StringCommand, persistent=True)	# Communication with the commander service
 
@@ -100,6 +102,7 @@ def publishers(rate):
 	publisher_wrench = rospy.Publisher(conf_pub_topic_wrench, WrenchStamped, queue_size = conf_publishing_rate) # Force and Torque publisher
 	publisher_frame  = rospy.Publisher(conf_pub_topic_iiwa_frame, EulerFrame, queue_size = conf_publishing_rate) # Publish frame
 	publisher_flange = rospy.Publisher(conf_pub_topic_iiwa_flange, EulerFrame, queue_size = conf_publishing_rate)
+	publisher_robot_state  = rospy.Publisher(conf_pub_topic_robot_state, RobotState, queue_size = conf_publishing_rate) # Publish frame
 
 	sleeper = rospy.Rate(rate)
 
@@ -111,20 +114,37 @@ def publishers(rate):
 		frame_msg = EulerFrame()
 		flange_msg = EulerFrame()
 
+		robot_state = RobotState()
+
+		# Joint state message
 		joint_state_msg = JointState()
 		joint_state_msg.header.stamp = now
 		joint_state_msg.header.frame_id = conf_robot_base_name
 
+		# Wrench message
 		wrench_stamp_msg = WrenchStamped()
 		wrench_stamp_msg.header.stamp = now
 		wrench_stamp_msg.header.frame_id = conf_robot_base_name
 
+		# lockCom is used to avoid concurrent access to the communication node
 		with lockCom:
 			strJoints   = com('get joint position','').response
 			strEffort   = com('get joint torque','').response
 			strForceTor = com('get cartesian force','').response
 			strToolFrame= com('get tool frame','').response
 			strFlangeFrame = com('get flange frame','').response
+			strSafetyState = com('get status safety','').response.strip()
+
+		# Check if the received strings are valid
+		if len(strFlangeFrame.split()) != 6:
+			rospy.logerr("strFlangeFrame does not contain 6 values. Got: '" + strFlangeFrame + "'")
+			exit(1)
+		if len(strToolFrame.split()) != 6:
+			rospy.logerr("strToolFrame does not contain 6 values. Got: '" + strToolFrame + "'")
+			exit(1)
+		if len(strForceTor.split()) != 6:
+			rospy.logerr("strForceTor does not contain 6 values. Got: '" + strForceTor + "'")
+			exit(1)
 
 		joint_state_msg.name = conf_joint_names
 
@@ -169,12 +189,35 @@ def publishers(rate):
 			wrench_stamp_msg.wrench.torque.x = current_tcp_torque[0]
 			wrench_stamp_msg.wrench.torque.y = current_tcp_torque[1]
 			wrench_stamp_msg.wrench.torque.z = current_tcp_torque[2]
+			# Fill safety state
+			if (strSafetyState == "nostop"):
+				robot_state.safety_state = 255
+			elif (strSafetyState == "stop0"):
+				robot_state.safety_state = 0
+			elif (strSafetyState == "stop1"):
+				robot_state.safety_state = 1
+			elif (strSafetyState == "stop2"):
+				robot_state.safety_state = 2
+			elif (strSafetyState == "not_ready"):
+				robot_state.safety_state = 2
+			elif (strSafetyState == "stopped"):
+				robot_state.safety_state = 3
+			elif (strSafetyState == "paused"):
+				robot_state.safety_state = 4
+			elif (strSafetyState == "repositioning"):
+				robot_state.safety_state = 5
+			elif (strSafetyState == "running"):
+				robot_state.safety_state = 254
+			else:
+				robot_state.safety_state = 42
+				rospy.logwarn("Got invalid safety state: " + strSafetyState)
 		# -----------------------------------------------------------
 
 		publisher_frame.publish(frame_msg)
 		publisher_flange.publish(flange_msg)
 		publisher_joints.publish(joint_state_msg)
 		publisher_wrench.publish(wrench_stamp_msg)
+		publisher_robot_state.publish(robot_state)
 
 		sleeper.sleep()
 
@@ -243,6 +286,7 @@ def move_manager(rate):
 			if not command_active:
 				if command_list:
 					command_active = command_list.pop(0)
+					rospy.logwarn("Executing command: " + command_active.command_type + command_active.pose_type + " " + str(command_active.pose))
 					executeCommand(com, command_active)
 		# -----------------------------------------------------------
 		sleeper.sleep()
@@ -255,7 +299,7 @@ def move_manager(rate):
 def checkFinished(com, command, code):
 
 	# Direct and Smart mode finishes immediately
-	if command.command_type == 'DIRECT' or command.command_type == 'SMART': # Direct commands are processed at a define rate
+	if command.command_type == 'DIRECT' or command.command_type == 'SMART' or command.command_type == 'LED_ON' or command.command_type == 'LED_OFF' : # Direct commands are processed at a define rate
 		return True
 
 	# Normal commands finish when the robot is in the near of the target position (Euclidean distance)
@@ -309,9 +353,9 @@ def executeCommand(com, command):
 			temp_pose = [command.pose[0] * 1000.0, command.pose[1] * 1000.0, command.pose[2] * 1000.0, command.pose[3], command.pose[4], command.pose[5]]
 			com('ptp move', ' '.join(str(i) for i in temp_pose) + ' ' + str(command.velocity[0]) + ' ' + str(command.blending[0] * 1000.0))
 	elif command.command_type == 'PTP' and command.pose_type == 'JOINTS':
-		assert len(command.pose) == 7 and len(command.velocity) == 7
+		assert len(command.pose) == 7 and len(command.velocity) == 7 and len(command.blending) > 0 
 		with lockCom:
-			com('joint move', ' '.join(str(i) for i in command.pose) + ' ' +  ' '.join(str(i) for i in command.velocity) )
+			com('joint move', ' '.join(str(i) for i in command.pose) + ' ' +  ' '.join(str(i) for i in command.velocity) + ' ' + str(command.blending[0]))
 	elif command.command_type == 'LINFORCE' and command.pose_type == 'EULER_INTRINSIC_ZYX':
 		assert len(command.pose) == 6 and len(command.velocity) == 1 and len(command.blending) > 0 and len(command.force_threshold) == 3
 		with lockCom:
@@ -337,6 +381,18 @@ def executeCommand(com, command):
 		assert len(command.pose) == 7 and len(command.velocity) == 7
 		with lockCom:
 			com('smart joint move', ' '.join(str(i) for i in command.pose) + ' ' + ' '.join(str(i) for i in command.velocity))
+	elif command.command_type == 'STOP':
+		with lockCom:
+			com('stop')
+	elif command.command_type == 'LED_ON':
+		with lockCom:
+			com('set led on','')
+	elif command.command_type == 'LED_OFF':
+		with lockCom:
+			com('set led off','')
+	elif command.command_type == 'BYE':
+		with lockCom:
+			com('bye')
 					
 # ---------------------------------------------------------------------------------------
 # Returns true if the multidimensional euclidean distance between a and b is less than delta	
@@ -405,6 +461,7 @@ def loadParameters():
 	global conf_pub_topic_wrench
 	global conf_pub_topic_iiwa_frame
 	global conf_pub_topic_iiwa_flange
+	global conf_pub_topic_robot_state
 	global conf_robot_base_name
 	global conf_joint_names
 	global conf_max_speed
@@ -422,6 +479,7 @@ def loadParameters():
 	conf_pub_topic_wrench = rospy.get_param('~topic_wrench', conf_pub_topic_wrench)
 	conf_pub_topic_iiwa_frame = rospy.get_param('~topic_iiwa_frame', conf_pub_topic_iiwa_frame)
 	conf_pub_topic_iiwa_flange = rospy.get_param('~topic_iiwa_flange', conf_pub_topic_iiwa_flange)
+	conf_pub_topic_robot_state = rospy.get_param('~topic_robot_state', conf_pub_topic_robot_state)
 	
 	conf_robot_base_name = rospy.get_param('~robot_base_name', conf_robot_base_name)
 	conf_joint_names = rospy.get_param('~joint_names', conf_joint_names)
@@ -440,6 +498,7 @@ if __name__ == '__main__':
 		
 		loadParameters()
 		
+		# SUNRISE communication node
 		rospy.wait_for_service(conf_com_node)
 
 		thread.start_new_thread(publishers,(conf_publishing_rate,))
@@ -450,3 +509,4 @@ if __name__ == '__main__':
 
 	except rospy.ROSInterruptException:
 		pass
+
