@@ -53,9 +53,9 @@ def flush(line):
 	while not rospy.is_shutdown():
 		try:
 			sock.send(line.encode())
-			rospy.logwarn(line.encode())
+			# rospy.logwarn(line.encode())
 			rsl = sock.recv(1024)
-			rospy.logwarn('Received: ' + rsl.decode())
+			# rospy.logwarn('Received: ' + rsl.decode())
 			return rsl.decode()
 		except:
 			connect()
@@ -69,10 +69,10 @@ def send_command(req):
 		response.error_code = 0				# No error by default
 
 		response.response = flush(req.command + " : " + req.parameters + "\n")	
-		if response.response is not None:
-			rospy.logwarn("Received: " + response.response)	# Debug
-		else:
-			rospy.logwarn("Received: None")
+		# if response.response is not None:
+		# 	rospy.logwarn("Received: " + response.response)	# Debug
+		# else:
+		# 	rospy.logwarn("Received: None")
 		
 		if response.response == 'error':
 			response.error_code = 1
