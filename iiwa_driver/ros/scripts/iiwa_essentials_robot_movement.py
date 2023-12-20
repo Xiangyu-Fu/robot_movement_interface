@@ -347,6 +347,16 @@ def executeCommand(com, command):
 		with lockCom:
 			temp_pose = [command.pose[0] * 1000.0, command.pose[1] * 1000.0, command.pose[2] * 1000.0, command.pose[3], command.pose[4], command.pose[5]]
 			com('lin move', ' '.join(str(i) for i in temp_pose) + ' ' + str(command.velocity[0]) + ' ' + str(command.blending[0] * 1000.0))
+	elif command.command_type == 'LINIMPEDENCE' and command.pose_type == 'EULER_INTRINSIC_ZYX':
+		assert len(command.pose) == 6 and len(command.velocity) == 1 and len(command.force_threshold) == 3
+		with lockCom:
+			temp_pose = [command.pose[0] * 1000.0, command.pose[1] * 1000.0, command.pose[2] * 1000.0, command.pose[3], command.pose[4], command.pose[5]]
+			temp_force_threshold = [command.force_threshold[0], command.force_threshold[1], command.force_threshold[2]]
+			torque_threshold = [0.1, 0.1, 0.1]
+			print
+			# temp_pose = [X, Y, Z, Alpha, Beta, Gamma, Velocity, ForceThresholdX, ForceThresholdY, ForceThresholdZ, TorqueThresholdX, ThresholdY, ThresholdZ]
+			com('linstiff move', ' '.join(str(i) for i in temp_pose) + ' ' + str(command.velocity[0]) + ' ' + '700' + ' ' + ' '.join(str(i) for i in temp_force_threshold) + ' ' + ' '.join(str(i) for i in torque_threshold))
+			print('linstiff move', ' '.join(str(i) for i in temp_pose) + ' ' + str(command.velocity[0]) + ' ' + '700' + ' ' + ' '.join(str(i) for i in temp_force_threshold) + ' ' + ' '.join(str(i) for i in torque_threshold))
 	elif command.command_type == 'PTP' and command.pose_type == 'EULER_INTRINSIC_ZYX':
 		assert len(command.pose) == 6 and len(command.velocity) == 1 and len(command.blending) > 0 
 		with lockCom:
