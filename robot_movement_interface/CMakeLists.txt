@@ -9,6 +9,7 @@ add_message_files(
   Command.msg
   CommandList.msg
   EulerFrame.msg
+  RobotState.msg
 )
 
 add_action_files(
