@@ -93,16 +93,6 @@ public class ROS_driver extends RoboticsAPIApplication {
 
 	JointPosition simulation_joints = null;
 
-	// Impedence controller declaration
-	CartesianImpedanceControlMode impedanceControlMode =
-	new CartesianImpedanceControlMode ();
-	irupedancECont ro1ModE • paraTEEIize (CaItDOF. X).setStiffnE35 (=七iEfa=5E×）：
-	impedanceControlMode. parametrize (CartDOF. Y) . setStiffness (stiffnessv) :
-	impedanceContro1Moae. Faranet=ize (CartDOF.2).3etSt1ffz=5≤(=七1==a=55z)
-	robot . move (ptp (jointPosition). setJointvelocityRel (re1ativespeEd.get () .setB1endingRel (b1encing)•sethode (impedanceContro1Mode))a
-	System. out.printin ("Home position reached")
-
-
 
 
 	public static void main(String[] args) {

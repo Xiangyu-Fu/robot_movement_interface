@@ -5,7 +5,7 @@
 	</node>
 
 	<!-- Start the driver -->
-	<node name="iiwa_robot_movement" pkg="iiwa_driver" type="iiwa_essentials_robot_movement.py">
+	<node name="iiwa_robot_movement" pkg="iiwa_driver" type="iiwa_essentials_robot_movement_original.py">
 		<rosparam file="$(find iiwa_driver)/config/config.yaml" command="load" />
 	</node>
 </launch>
