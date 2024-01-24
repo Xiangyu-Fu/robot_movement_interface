@@ -104,10 +104,12 @@ def flush(line):
 	while not rospy.is_shutdown():
 		try:
 			sock.send(line.encode())
-			rospy.logwarn("Socket send:"+line.encode())
-			rsl = sock.recv(1024)
-			rospy.logwarn('Received: ' + rsl.decode())
-			return rsl.decode()
+			# rospy.logwarn("Socket send:"+line.encode())
+			# rsl = sock.recv(1)
+			# rospy.logwarn("get respond")
+			# rospy.logwarn('Received: ' + rsl.decode())
+			# return rsl.decode()
+			return True
 		except:
 			socket_connect()
 
@@ -137,49 +139,49 @@ def move_manager(rate):
 		with lock:
 			#code = 0
 			# There is an active command, check if it is finished
-			"""if command_active:
-				if True:
-					# Blending can be default or overwritten by the command
-					blending = 0.0 # 1 mm
-					if len(command_active.blending) > 0:
-						blending = command_active.blending[0]
-					if len(command_active.blending) > 1:
-						delta = command_active.blending[1]
+			# if command_active:
+			# 	if True:
+			# 		# Blending can be default or overwritten by the command
+			# 		blending = 0.0 # 1 mm
+			# 		if len(command_active.blending) > 0:
+			# 			blending = command_active.blending[0]
+			# 		if len(command_active.blending) > 1:
+			# 			delta = command_active.blending[1]
 
-					# default result code is success
-					# result code: 0 - success
-					# result code: 100 - error (not implemented)
-					# result code: 200 - collision
-					result_code = 0
+			# 		# default result code is success
+			# 		# result code: 0 - success
+			# 		# result code: 100 - error (not implemented)
+			# 		# result code: 200 - collision
+			# 		result_code = 0
 
-					# check if the target was reached when using force threshold commands or if there was a collision
-					if command_active.command_type == "PTPFORCE" or command_active.command_type == "LINFORCE":
-						# when target was not reached with the configuratiton
-						if not multiDimensionalDistance(current_tcp_frame[:3], command_active.pose[:3], blending + conf_cartesian_delta):							
-							result_code = 200
+			# 		# check if the target was reached when using force threshold commands or if there was a collision
+			# 		if command_active.command_type == "PTPFORCE" or command_active.command_type == "LINFORCE":
+			# 			# when target was not reached with the configuratiton
+			# 			if not multiDimensionalDistance(current_tcp_frame[:3], command_active.pose[:3], blending + conf_cartesian_delta):							
+			# 				result_code = 200
 
-                    # Keep alive direct commands by coping the command again in the pipeline (DIRECT and SMART mode only)
-					if len(command_list) == 0:
-						if command_active.command_type == 'DIRECT' or command_active.command_type == 'SMART':
-							command_list.insert(0, command_active)
-					# Advance 1 in the pipeline
-					command_last = command_active
-					command_active = None
-					# Publish message feedback
-					command_result_msg = Result()
-					command_result_msg.command_id = command_last.command_id
-					command_result_msg.result_code = result_code
-					# publisher_command_result.publish(command_result_msg)
+            #         # Keep alive direct commands by coping the command again in the pipeline (DIRECT and SMART mode only)
+			# 		if len(command_list) == 0:
+			# 			if command_active.command_type == 'DIRECT' or command_active.command_type == 'SMART':
+			# 				command_list.insert(0, command_active)
+			# 		# Advance 1 in the pipeline
+			# 		command_last = command_active
+			# 		command_active = None
+			# 		# Publish message feedback
+			# 		command_result_msg = Result()
+			# 		command_result_msg.command_id = command_last.command_id
+			# 		command_result_msg.result_code = result_code
+			# 		# publisher_command_result.publish(command_result_msg)
 			# There is currently no active command, so execute next		
-			else:
-				if command_list:
-					command_active = command_list.pop(0)
-					rospy.logwarn("Executing command: " + command_active.command_type + command_active.pose_type + " " + str(command_active.pose))
-					executeCommand(com, command_active)"""
+			# else:
+			# 	if command_list:
+			# 		command_active = command_list.pop(0)
+			# 		rospy.logwarn("Executing command: " + command_active.command_type + command_active.pose_type + " " + str(command_active.pose))
+			# 		executeCommand(command_active)
 		
 			if command_list:
 				command_active = command_list.pop(0)
-				rospy.logwarn("Executing command: " + command_active.command_type + " "+ command_active.pose_type + " " + str(command_active.pose))
+				# rospy.logwarn("Executing command: " + command_active.command_type + " "+ command_active.pose_type + " " + str(command_active.pose))
 				executeCommand(command_active)
 		
 		# rospy.logwarn("move loop")
@@ -199,14 +201,14 @@ def executeCommand(command):
 			temp_pose = [command.pose[0] * 1000.0, command.pose[1] * 1000.0, command.pose[2] * 1000.0, command.pose[3], command.pose[4], command.pose[5]]
 			temp_force_threshold = [command.force_threshold[0], command.force_threshold[1], command.force_threshold[2]]
 			torque_threshold = [0.1, 0.1, 0.1]
-			rospy.logwarn("sending command")
+			# rospy.logwarn("sending command")
 
-			response = StringCommandResponse()	# ROS StringCommandResponse service response
-			response.error_code = 0				# No error by default
+			# response = StringCommandResponse()	# ROS StringCommandResponse service response
+			# response.error_code = 0				# No error by default
 			# temp_pose = [X, Y, Z, Alpha, Beta, Gamma, Velocity, ForceThresholdX, ForceThresholdY, ForceThresholdZ, TorqueThresholdX, ThresholdY, ThresholdZ]
 			# com('linstiff move', ' '.join(str(i) for i in temp_pose) + ' ' + str(command.velocity[0]) + ' ' + '700' + ' ' + ' '.join(str(i) for i in temp_force_threshold) + ' ' + ' '.join(str(i) for i in torque_threshold))
-			response.response = flush('linstiff move' + " : ".join(str(i) for i in temp_pose) + ' ' + str(command.velocity[0]) + ' ' + '700' + ' ' + ' '.join(str(i) for i in temp_force_threshold) + ' ' + ' '.join(str(i) for i in torque_threshold) + "\n" ) 			
-			rospy.logwarn("command executed")
+			flush('linstiff move' + " : " + " ".join(str(i) for i in temp_pose) + ' ' + str(command.velocity[0]) + ' ' + '700' + ' ' + ' '.join(str(i) for i in temp_force_threshold) + ' ' + ' '.join(str(i) for i in torque_threshold) + "\n" ) 			
+			# rospy.logwarn('linstiff move' + " : ".join(str(i) for i in temp_pose) + ' ' + str(command.velocity[0]) + ' ' + '700' + ' ' + ' '.join(str(i) for i in temp_force_threshold) + ' ' + ' '.join(str(i) for i in torque_threshold) + "\n" )
 				
 # ---------------------------------------------------------------------------------------
 # Subscription to joint_path_command (trajectory_msgs/JointTrajectory)
@@ -224,7 +226,7 @@ def commands_callback(msg):
 			command_list = msg.commands
 		else:
 			command_list.extend(msg.commands)
-		#rospy.logwarn("command received")
+		# rospy.logwarn("command received")
 	# -----------------------------------------------------------
 
 # ---------------------------------------------------------------------------------------

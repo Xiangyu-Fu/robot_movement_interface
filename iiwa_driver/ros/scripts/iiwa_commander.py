@@ -69,6 +69,7 @@ def send_command(req):
 		response.error_code = 0				# No error by default
 
 		response.response = flush(req.command + " : " + req.parameters + "\n")	
+		# rospy.logwarn(req.command + " : " + req.parameters + "\n")
 		# if response.response is not None:
 		# 	rospy.logwarn("Received: " + response.response)	# Debug
 		# else:
